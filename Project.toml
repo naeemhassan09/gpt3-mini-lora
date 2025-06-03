@@ -1,0 +1,9 @@
+[deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+EvalMetrics = "251d5f9e-10c1-4699-ba24-e0ad168fa3e4"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+HuggingFaceDatasets = "d94b9a45-fdf5-4270-b024-5cbb9ef7117d"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Transformers = "21ca0261-441d-5938-ace7-c90938fde4d4"
