@@ -5,7 +5,7 @@ using Flux: Dense, softmax, LayerNorm, @functor
 using Random
 
 include("lora_adapter.jl")
-using .LoRAAdapter: LoRALinear, get_lora_params
+using .LoRAAdapter: LoRALinear, get_lora_params, assign_lora_params!
 
 
 # ----------------------------------------
@@ -208,6 +208,6 @@ function forward_with_lora(model, lora_params::Vector)
     return x -> model_copy(x)
 end
 
-export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters, MiniSelfAttention_LoRA, LoRALinear , get_lora_params, forward_with_lora 
+export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters, MiniSelfAttention_LoRA, LoRALinear , get_lora_params, forward_with_lora, assign_lora_params!
 
 end

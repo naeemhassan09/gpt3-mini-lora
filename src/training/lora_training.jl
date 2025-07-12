@@ -46,4 +46,4 @@ accs = run_cross_validation(() -> GPTMini_LoRA(cfg, 8), x_data, y_data, cfg.n_cl
 
 # Save parameters
 lora_params = get_lora_params(test_model)
-@save "lora_params.bson" lora_params
+@save "lora_params.bson" lora_params vocab cfg

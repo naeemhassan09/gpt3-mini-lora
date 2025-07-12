@@ -2,7 +2,7 @@ module MNLIData
 
 using Flux, Random
 
-export load_mnli_data, load_vocab
+export load_mnli_data, load_vocab, tokenize_sample
 
 # ----------------------------------------
 # Load vocab.txt into a Dict
@@ -52,6 +52,12 @@ function load_mnli_data(seq_len::Int=4)
     end
 
     return x_data, y_data, vocab
+end
+
+function tokenize_sample(premise::String, hypothesis::String, vocab::Dict{String, Int}; seq_len::Int=4)
+    p_idx = dummy_tokenize(premise, vocab, seq_len)
+    h_idx = dummy_tokenize(hypothesis, vocab, seq_len)
+    return vcat(p_idx, h_idx)  # concat
 end
 
 end  # module

@@ -3,3 +3,6 @@
 # pixi environments
 .pixi
 *.egg-info
+
+MNLI.zip
+MNLI

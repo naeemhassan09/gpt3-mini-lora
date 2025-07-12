@@ -63,7 +63,15 @@ function get_lora_params(model)
     return lora_params
 end
 
-export  LoRALinear, get_lora_params
+function assign_lora_params!(model, lora_params)
+    # Get the references to the LoRA trainable layers
+    model_params = get_lora_params(model)
+    for (param_ref, param_val) in zip(model_params, lora_params)
+        param_ref .= param_val
+    end
+end
+
+export  LoRALinear, get_lora_params, assign_lora_params!
 
 
 
