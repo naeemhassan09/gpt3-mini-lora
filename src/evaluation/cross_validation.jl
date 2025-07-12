@@ -7,7 +7,7 @@ export run_cross_validation
 
 function run_cross_validation(
     model_fn, x_data, y_data, n_classes;
-    train_step, cfg, epochs=3, folds=5, batch_size=16  
+    train_step, cfg, epochs=3, folds=10, batch_size=16  
 )
     N = length(x_data)
     idx = shuffle(1:N)
