@@ -1,3 +1,4 @@
+#gpt_mini.jl
 module GPTMiniModel
 using Flux
 using Flux: Dense, softmax, LayerNorm, @functor
@@ -26,15 +27,10 @@ function manual_batched_mul(A::Array{Float32,3}, B::Array{Float32,3})
     @assert size(A, 1) == size(B, 1) "Batch size mismatch!"
     @assert size(A, 3) == size(B, 2) "Inner dim mismatch!"
 
-    BATCH, M, K = size(A)
-    _, _, N = size(B)
-    C = Array{Float32}(undef, BATCH, M, N)
-
-    for b in 1:BATCH
-        C[b, :, :] = A[b, :, :] * B[b, :, :]
-    end
-
-    return C
+    BATCH = size(A, 1)
+    # Compute each batched matmul separately and collect into array
+    C_list = [A[b, :, :] * B[b, :, :] for b in 1:BATCH]  # List of (M×N) matrices
+    return permutedims(cat(C_list..., dims=3), (3, 1, 2))  # Shape: (BATCH, M, N)
 end
 
 # ----------------------------------------

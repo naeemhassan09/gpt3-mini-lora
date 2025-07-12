@@ -23,6 +23,8 @@ function (l::LoRALinear)(x)
     return l.base(x) .+ (l.α / size(l.B.weight, 1)) * l.B(l.A(x))
 end
 
+# 
+
 function get_lora_params(model)
     lora_params = []
     function collect_lora_params(m)
@@ -30,23 +32,23 @@ function get_lora_params(model)
         if m isa LoRAAdapter.LoRALinear
             println("Found LoRALinear layer: ", m)
             append!(lora_params, Flux.params(m.A, m.B))
-        elseif m isa Chain
+        elseif m isa Flux.Chain
             println("Found Chain, iterating layers")
             for layer in m
                 collect_lora_params(layer)
             end
-        elseif hasfield(typeof(m), :P)
-            println("Skipping positional encoding-like structure: ", typeof(m))
-        elseif m isa Dense || m isa LayerNorm
+        elseif m isa Main.GPTMiniModel.LearnablePositionalEncoding
+            println("Skipping positional encoding: ", typeof(m))
+        elseif m isa Flux.Dense || m isa Flux.LayerNorm
             println("Skipping Dense or LayerNorm: ", typeof(m))
-        elseif hasfield(typeof(m), :Wq) && hasfield(typeof(m), :Wk) && hasfield(typeof(m), :Wv) && hasfield(typeof(m), :Wo)
-            println("Found MiniSelfAttention-like structure, checking fields")
+        elseif m isa Main.GPTMiniModel.MiniSelfAttention
+            println("Found MiniSelfAttention, checking fields")
             collect_lora_params(m.Wq)
             collect_lora_params(m.Wk)
             collect_lora_params(m.Wv)
             collect_lora_params(m.Wo)
-        elseif hasfield(typeof(m), :embed) && hasfield(typeof(m), :pos_enc) && hasfield(typeof(m), :attn) && hasfield(typeof(m), :ln) && hasfield(typeof(m), :classifier)
-            println("Found GPTMini-like structure, checking fields")
+        elseif m isa Main.GPTMiniModel.GPTMini
+            println("Found GPTMini, checking fields")
             collect_lora_params(m.embed)
             collect_lora_params(m.pos_enc)
             collect_lora_params(m.attn)
@@ -57,11 +59,11 @@ function get_lora_params(model)
         end
     end
     collect_lora_params(model)
-    println("LoRA parameters collected: ", lora_params)
+    println("LoRA parameters collected: ", length(lora_params))
     return lora_params
 end
 
-export get_lora_params
+export  LoRALinear, get_lora_params
 
 
 

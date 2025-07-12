@@ -1,40 +1,34 @@
-# src/data/mnli_preprocessing.jl
 module MNLIData
 
-using Revise
-using Flux
-using Random
-using Transformers
-using Transformers.HuggingFace
-using Transformers.TextEncoders: WordPieceModel, encode  # ✅ Fix: import encode
+using Flux, Random
 
-export load_mnli_data
+export load_mnli_data, load_vocab
 
-# Load tokenizer from HuggingFace
-const encoder = hgf"bert-base-uncased:tokenizer"
-
-# Tokenize a sentence using HuggingFace encoder
-function tokenize(sentence::String, vocab::Dict{String, Int}, seq_len::Int)
-    tokens = encode(encoder, sentence).token
-    indices = [get(vocab, t, 1) for t in tokens[1:min(end, seq_len)]]
-    padded = vcat(indices, fill(1, seq_len - length(indices)))
-    return padded
+# ----------------------------------------
+# Load vocab.txt into a Dict
+# ----------------------------------------
+function load_vocab(vocab_path::String)
+    vocab = Dict{String, Int}()
+    for (i, line) in enumerate(eachline(vocab_path))
+        vocab[line] = i
+    end
+    return vocab
 end
 
-# Dummy tokenizer (for fallback)
+# ----------------------------------------
+# Tokenizer: simple whitespace-based fallback
+# ----------------------------------------
 function dummy_tokenize(sentence::String, vocab::Dict{String, Int}, seq_len::Int)
-    tokens = split(lowercase(sentence))
-    indices = [get(vocab, w, 1) for w in tokens[1:min(end, seq_len)]]
-    padded = vcat(indices, fill(1, seq_len - length(indices)))
+    tokens = split(lowercase(sentence))  # naive whitespace split
+    indices = [get(vocab, token, 1) for token in tokens[1:min(end, seq_len)]]
+    padded = vcat(indices, fill(1, seq_len - length(indices)))  # pad with [PAD] (assumed index 1)
     return padded
 end
 
-function onehot_encode(indices::Vector{Int}, vocab_size::Int)
-    return Flux.onehotbatch(indices, 1:vocab_size)
-end
-
-function load_mnli_data(seq_len::Int=4, vocab_size::Int=50)
-    # Mock samples
+# ----------------------------------------
+# Load mock MNLI samples
+# ----------------------------------------
+function load_mnli_data(seq_len::Int=4)
     samples = [
         ("The cat sits", "A feline is sitting", 1),
         ("The sky is blue", "It is night", 3),
@@ -43,21 +37,17 @@ function load_mnli_data(seq_len::Int=4, vocab_size::Int=50)
         ("Apples are red", "Apples can be green", 2)
     ]
 
-    # Build dummy vocabulary
-    texts = vcat(getindex.(samples, 1)..., getindex.(samples, 2)...)
-    all_words = Set(Iterators.flatten(split.(lowercase.(texts))))
-    vocab = Dict{String, Int}(word => i + 1 for (i, word) in enumerate(all_words))
-    vocab["<unk>"] = 1  # unknown token index
+    # Load real vocab file (e.g., ~30k tokens from BERT)
+    vocab = load_vocab("src/data/bert-base-uncased/vocab.txt")
 
-    x_data = Vector{Any}()
+    x_data = Vector{Vector{Int}}()
     y_data = Int[]
 
     for (premise, hypothesis, label) in samples
-        p_idx = tokenize(premise, vocab, seq_len)
-        h_idx = tokenize(hypothesis, vocab, seq_len)
-        full_idx = vcat(p_idx, h_idx)
-        x = onehot_encode(full_idx, vocab_size)
-        push!(x_data, x)
+        p_idx = dummy_tokenize(premise, vocab, seq_len)
+        h_idx = dummy_tokenize(hypothesis, vocab, seq_len)
+        full_idx = vcat(p_idx, h_idx)  # input length = 2 * seq_len
+        push!(x_data, full_idx)
         push!(y_data, label)
     end
 

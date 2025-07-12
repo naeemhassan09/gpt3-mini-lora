@@ -1,21 +1,47 @@
-using Revise
-using Flux
-using Random
-using Statistics
-using BSON: @save
+using Revise, Flux, Random, Statistics, BSON, Logging, Optimisers
 include("../models/gpt_mini.jl")
 include("../data/mnli_preprocessing.jl")
 include("../evaluation/cross_validation.jl")
+using .GPTMiniModel, .MNLIData, .CrossValidation
 
-using .GPTMiniModel: GPTMini_LoRA, GPTMini, GPTMiniConfig, count_parameters, MiniSelfAttention, LoRALinear, get_lora_params 
+global_logger(ConsoleLogger(stdout, Logging.Info))
 
+x_data, y_data, vocab = load_mnli_data(64)  # <-- pass desired sequence length per sentence
+cfg = GPTMiniConfig(length(vocab), 128, 64, 3) 
+@info typeof(x_data[1]) 
 
-using .MNLIData
-using .CrossValidation
+@info "Loaded MNLI data: $(length(x_data)) samples, vocab size: $(length(vocab))"
 
-cfg = GPTMiniConfig(50, 8, 8, 3)
-x_data, y_data, vocab = load_mnli_data(cfg.seq_len, cfg.vocab_size)
+function train_step(model, x, y, opt_state)
+    lora_params = get_lora_params(model)
 
-accs = run_cross_validation(() -> GPTMini_LoRA(cfg, 2), x_data, y_data, cfg.n_classes; folds=2, batch_size=2)
-println("Best accuracy: ", maximum(accs))
-@save "best_lora_model.bson" model=GPTMini_LoRA(cfg, 2)
+    function loss_fn(params)
+        # Mutate LoRA parameters in place
+        for (p_ref, p_val) in zip(lora_params, params)
+            p_ref .= p_val
+        end
+        # Transpose y to (num_classes, batch_size)
+        return Flux.logitcrossentropy(model(x), y')
+    end
+
+    loss, grads = Flux.withgradient(loss_fn, lora_params)
+    @info "Training loss: $loss"
+
+    opt_state, new_params = Optimisers.update(opt_state, lora_params, grads)
+
+    # Mutate model parameters with updated values
+    for (p_ref, p_val) in zip(lora_params, new_params)
+        p_ref .= p_val
+    end
+
+    return loss, opt_state
+end
+
+opt = Optimisers.ADAM(3e-2)
+opt_state = Optimisers.setup(opt, nothing)  # Will be updated in train_step
+accs = run_cross_validation(() -> GPTMini_LoRA(cfg, 8), x_data, y_data, cfg.n_classes;
+                            train_step=train_step, cfg=cfg, folds=5, batch_size=16)
+@info "Best accuracy: $(maximum(accs))"
+
+lora_params = get_lora_params(GPTMini_LoRA(cfg, 8))
+@save "lora_params.bson" lora_params
