@@ -17,3 +17,10 @@ model = GPTMini(cfg)
 y = model(x)
 println("Output shape: ", size(y))  # should be (B, n_classes)
 println("Parameter count: ", count_parameters(model))
+
+# LoRA
+println("✅ Testing LoRA GPTMini...")
+lora_model = GPTMini_LoRA(cfg, 2)  # r = 2
+y_lora = lora_model(x)
+println("LoRA Output shape: ", size(y_lora))
+println("LoRA Parameter count: ", count_parameters(lora_model))

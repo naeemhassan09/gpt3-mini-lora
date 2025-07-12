@@ -2,6 +2,25 @@ using Flux
 using Flux: Dense, softmax, LayerNorm, @functor
 using Random
 
+
+#-----------------------------------------
+# LoRA Adapter Module
+#-----------------------------------------
+include("lora_adapter.jl")
+using .LoRAAdapter: LoRALinear
+
+# ----------------------------------------
+# MiniSelfAttention with LoRA
+# ----------------------------------------
+function MiniSelfAttention_LoRA(d_model::Int, r::Int)
+    MiniSelfAttention(
+        LoRALinear(Dense(d_model, d_model), r),
+        Dense(d_model, d_model),
+        LoRALinear(Dense(d_model, d_model), r),
+        Dense(d_model, d_model)
+    )
+end
+
 # ----------------------------------------
 # Manual Batched Matrix Multiplication
 # ----------------------------------------
@@ -51,24 +70,26 @@ end
 # ----------------------------------------
 # Apply dense layer to (S, B, V) or (S, B, D) input
 # ----------------------------------------
-function apply_dense3d(d::Dense, x::Array{Float32, 3})
+function apply_dense3d(d, x::Array{Float32, 3})
     S, B, in_dim = size(x)
     x_flat = permutedims(x, (3, 1, 2))         # (in_dim, S, B)
     x_flat = reshape(x_flat, in_dim, S * B)    # (in_dim, S*B)
     y_flat = d(x_flat)                         # (out_dim, S*B)
-    out_dim = size(d.weight, 1)
+
+    # Determine output dimension (works for both Dense and LoRALinear)
+    out_dim = size(Flux.params(d)[1], 1)
+
     y = reshape(y_flat, out_dim, S, B)         # (out_dim, S, B)
     return permutedims(y, (2, 3, 1))           # (S, B, out_dim)
 end
-
 # ----------------------------------------
 # Self-Attention
 # ----------------------------------------
 struct MiniSelfAttention
-    Wq::Dense
-    Wk::Dense
-    Wv::Dense
-    Wo::Dense
+    Wq
+    Wk
+    Wv
+    Wo
 end
 @functor MiniSelfAttention
 
@@ -111,6 +132,7 @@ function (m::MiniSelfAttention)(x)
     println("context permuted shape: ", size(context))
 
     output = apply_dense3d(m.Wo, context)  # (S, B, D)
+    
     println("output shape: ", size(output))
     return output
 end
@@ -173,4 +195,17 @@ function print_used_packages()
             println("  - $(pkg.name) (Version: $(pkg.version !== nothing ? pkg.version : "unknown"))")
         end
     end
+end
+
+
+# ----------------------------------------
+# GPTMini with LoRA
+# ----------------------------------------
+function GPTMini_LoRA(cfg::GPTMiniConfig, r::Int)
+    embed = Dense(cfg.vocab_size, cfg.d_model)
+    pos = LearnablePositionalEncoding(cfg.seq_len, cfg.d_model)
+    attn = MiniSelfAttention_LoRA(cfg.d_model, r)
+    ln = LayerNorm(cfg.d_model)
+    classifier = Dense(cfg.seq_len * cfg.d_model, cfg.n_classes)
+    return GPTMini(embed, pos, attn, ln, classifier)
 end
