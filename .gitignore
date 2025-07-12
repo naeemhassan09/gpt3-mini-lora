@@ -1,0 +1,5 @@
+*.bson
+
+# pixi environments
+.pixi
+*.egg-info

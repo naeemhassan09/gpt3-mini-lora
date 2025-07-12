@@ -1,4 +1,5 @@
-using Revise, Flux, Random, Statistics, BSON, Logging, Optimisers
+using Revise, Flux, Random, Statistics, Logging, Optimisers
+using BSON: @save
 include("../models/gpt_mini.jl")
 include("../data/mnli_preprocessing.jl")
 include("../evaluation/cross_validation.jl")
@@ -17,12 +18,10 @@ function train_step(model, x, y, opt_state)
 
     function loss_fn(params)
         # Mutate LoRA parameters in place
-        for (p_ref, p_val) in zip(lora_params, params)
-            p_ref .= p_val
-        end
-        # Transpose y to (num_classes, batch_size)
-        return Flux.logitcrossentropy(model(x), y')
+        fwd = forward_with_lora(model, params)
+        return Flux.logitcrossentropy(fwd(x), y)
     end
+
 
     loss, grads = Flux.withgradient(loss_fn, lora_params)
     @info "Training loss: $loss"

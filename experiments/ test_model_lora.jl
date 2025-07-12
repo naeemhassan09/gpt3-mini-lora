@@ -69,7 +69,7 @@ println("🧮 LoRA Parameter count: ", count_parameters(lora_model))
 
     x = rand(Float32, cfg.seq_len, 2, cfg.vocab_size)  # Fix shape: (seq_len, batch_size, vocab_size)
     y = model(x)
-    @test size(y) == (2, cfg.n_classes)
+    @test size(y) == (cfg.n_classes,2 )
 
     lora_params = get_lora_params(model)
     @test !isempty(lora_params)

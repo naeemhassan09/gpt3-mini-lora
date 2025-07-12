@@ -164,7 +164,7 @@ function (m::GPTMini)(x::Array{Float32, 3})
     println("After reshape shape: ", size(h_flat))
     y = m.classifier(h_flat)           # (n_classes, B)
     println("After classifier shape: ", size(y))
-    return softmax(y')                 # (B, n_classes)
+    return softmax(y)                 # (B, n_classes)
 end
 
 function count_parameters(model)
@@ -192,6 +192,22 @@ function MiniSelfAttention_LoRA(d_model::Int, r::Int)
     )
 end
 
-export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters, MiniSelfAttention_LoRA, LoRALinear , get_lora_params 
+function forward_with_lora(model, lora_params::Vector)
+    # Shallow copy of model
+    model_copy = deepcopy(model)
+
+    # Inject LoRA parameters
+    local idx = 1
+    for layer in Flux.params(model_copy)
+        if layer isa GPTMiniModel.LoRALinear
+            layer.A.weight .= lora_params[idx]; idx += 1
+            layer.B.weight .= lora_params[idx]; idx += 1
+        end
+    end
+
+    return x -> model_copy(x)
+end
+
+export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters, MiniSelfAttention_LoRA, LoRALinear , get_lora_params, forward_with_lora 
 
 end

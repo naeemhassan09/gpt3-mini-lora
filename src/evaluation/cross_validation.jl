@@ -51,15 +51,15 @@ function run_cross_validation(
             end
 
             avg_loss = mean([
-                loss(reshape(x, :, 1), Flux.onehot(y, 1:n_classes))
-                for (x, y) in zip(x_train, y_train)
+            loss(prepare_batch([x], cfg), Flux.onehot(y, 1:n_classes))
+            for (x, y) in zip(x_train, y_train)
             ])
             println("Fold $i, Epoch $epoch, Loss: $avg_loss")
         end
 
         correct = 0
         for (x, y) in zip(x_test, y_test)
-            x3d = reshape(x, :, 1)
+            x3d = prepare_batch([x], cfg)  # batch size = 1
             pred = Flux.onecold(model(x3d), 1:n_classes)
             correct += pred == y ? 1 : 0
         end
