@@ -9,11 +9,11 @@ using Pkg
 # Load Modules
 # -------------------------------
 include("../src/models/gpt_mini.jl")
-include("../src/models/lora_adapter.jl")
+
 
 # Import from modules
-using .GPTMiniModel: GPTMini_LoRA, GPTMini, GPTMiniConfig, count_parameters, MiniSelfAttention
-using .LoRAAdapter: LoRALinear, get_lora_params
+using .GPTMiniModel: GPTMini_LoRA, GPTMini, GPTMiniConfig, count_parameters, MiniSelfAttention, LoRALinear, get_lora_params 
+
 
 # -------------------------------
 # Print Dependencies
@@ -64,8 +64,8 @@ println("🧮 LoRA Parameter count: ", count_parameters(lora_model))
 
     @test model isa GPTMini
     @test model.attn isa GPTMiniModel.MiniSelfAttention
-    @test model.attn.Wq isa LoRAAdapter.LoRALinear
-    @test model.attn.Wv isa LoRAAdapter.LoRALinear  # Fix type qualification
+    @test model.attn.Wq isa LoRALinear
+    @test model.attn.Wv isa LoRALinear  # Fix type qualification
 
     x = rand(Float32, cfg.seq_len, 2, cfg.vocab_size)  # Fix shape: (seq_len, batch_size, vocab_size)
     y = model(x)

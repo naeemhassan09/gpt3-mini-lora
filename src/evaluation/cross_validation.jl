@@ -5,9 +5,6 @@ using Random
 using Statistics
 using Optimisers
 
-include("../models/lora_adapter.jl")
-using .LoRAAdapter: get_lora_params
-
 export run_cross_validation
 
 function run_cross_validation(model_fn, x_data, y_data, n_classes; epochs=3, folds=2, batch_size=2)

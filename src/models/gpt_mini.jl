@@ -4,7 +4,7 @@ using Flux: Dense, softmax, LayerNorm, @functor
 using Random
 
 include("lora_adapter.jl")
-using .LoRAAdapter: LoRALinear
+using .LoRAAdapter: LoRALinear, get_lora_params
 
 
 # ----------------------------------------
@@ -187,6 +187,15 @@ function GPTMini_LoRA(cfg::GPTMiniConfig, r::Int)
     return GPTMini(embed, pos, attn, ln, classifier)
 end
 
-export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters
+function MiniSelfAttention_LoRA(d_model::Int, r::Int)
+    MiniSelfAttention(
+        LoRALinear(Dense(d_model, d_model), r),
+        Dense(d_model, d_model),
+        LoRALinear(Dense(d_model, d_model), r),
+        Dense(d_model, d_model)
+    )
+end
+
+export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters, MiniSelfAttention_LoRA, LoRALinear , get_lora_params 
 
 end

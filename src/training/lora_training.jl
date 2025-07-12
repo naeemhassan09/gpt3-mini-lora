@@ -7,6 +7,9 @@ include("../models/gpt_mini.jl")
 include("../data/mnli_preprocessing.jl")
 include("../evaluation/cross_validation.jl")
 
+using .GPTMiniModel: GPTMini_LoRA, GPTMini, GPTMiniConfig, count_parameters, MiniSelfAttention, LoRALinear, get_lora_params 
+
+
 using .MNLIData
 using .CrossValidation
 
