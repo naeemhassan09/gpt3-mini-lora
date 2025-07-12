@@ -7,10 +7,11 @@ using .GPTMiniModel, .MNLIData, .CrossValidation
 
 global_logger(ConsoleLogger(stdout, Logging.Info))
 
-x_data, y_data, vocab = load_mnli_data(64)
-cfg = GPTMiniConfig(length(vocab), 128, 64, 3) 
-@info typeof(x_data[1]) 
+x_data, y_data, vocab = load_mnli_data(128, 50)
 @info "Loaded MNLI data: $(length(x_data)) samples, vocab size: $(length(vocab))"
+@info typeof(x_data[1]) 
+cfg = GPTMiniConfig(length(vocab), 128, 64, 3) 
+
 
 # Count LoRA-only parameters
 test_model = GPTMini_LoRA(cfg, 4)
@@ -42,7 +43,15 @@ opt = Optimisers.ADAM(3e-2)
 opt_state = Optimisers.setup(opt, nothing)
 accs = run_cross_validation(() -> GPTMini_LoRA(cfg, 8), x_data, y_data, cfg.n_classes;
                             train_step=train_step, cfg=cfg, folds=10, batch_size=16)
-@info "Best accuracy: $(maximum(accs))"
+
+valid_accs = filter(x -> x !== nothing, accs)
+
+if !isempty(valid_accs)
+    @info "Best accuracy: $(maximum(valid_accs))"
+    @info "Average accuracy: $(round(mean(valid_accs), digits=4))"
+else
+    @warn "No valid fold accuracies returned!"
+end
 
 # Save parameters
 lora_params = get_lora_params(test_model)

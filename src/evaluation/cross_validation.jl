@@ -1,6 +1,6 @@
 module CrossValidation
 
-using Flux, Random, Statistics, Optimisers
+using Flux, Random, Statistics, Optimisers, Dates 
 using ..GPTMiniModel: get_lora_params, GPTMiniConfig
 
 export run_cross_validation
@@ -73,15 +73,23 @@ function run_cross_validation(
     return acc_scores
 end
 
-function prepare_batch(x_batch, cfg::GPTMiniConfig)
-    # Convert vector of token index arrays to (seq_len, batch_size, vocab_size)
+function prepare_batch(x_batch::Vector{Vector{Int}}, cfg::GPTMiniConfig)
     seq_len = cfg.seq_len
     batch_size = length(x_batch)
     vocab_size = cfg.vocab_size
 
-    # Convert to matrix of size (seq_len, batch_size)
+    # DEBUG: Print the lengths of each sequence in the batch
+    for (i, x) in enumerate(x_batch)
+        if length(x) != seq_len
+            println("[DEBUG] Sequence $i has length $(length(x)) ≠ cfg.seq_len ($seq_len)")
+        end
+    end
+
+    @assert all(length(x) == seq_len for x in x_batch) "Some inputs do not match cfg.seq_len = $seq_len"
+
     token_matrix = hcat(x_batch...)  # (seq_len, batch_size)
-    x_onehot = Flux.onehotbatch(token_matrix, 1:vocab_size)  # (vocab_size, seq_len * batch_size)
+    flat_tokens = vec(token_matrix)
+    x_onehot = Flux.onehotbatch(flat_tokens, 1:vocab_size)
     x_onehot = reshape(x_onehot, vocab_size, seq_len, batch_size)
     x_onehot = permutedims(x_onehot, (2, 3, 1))  # (seq_len, batch_size, vocab_size)
     return Float32.(x_onehot)

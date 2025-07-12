@@ -27,39 +27,38 @@ end
 
 function get_lora_params(model)
     lora_params = []
+
     function collect_lora_params(m)
-        println("Inspecting type: ", typeof(m))
         if m isa LoRAAdapter.LoRALinear
-            println("Found LoRALinear layer: ", m)
+            @info "[LoRA Param]" found=typeof(m)
             append!(lora_params, Flux.params(m.A, m.B))
         elseif m isa Flux.Chain
-            println("Found Chain, iterating layers")
             for layer in m
                 collect_lora_params(layer)
             end
-        elseif m isa Main.GPTMiniModel.LearnablePositionalEncoding
-            println("Skipping positional encoding: ", typeof(m))
-        elseif m isa Flux.Dense || m isa Flux.LayerNorm
-            println("Skipping Dense or LayerNorm: ", typeof(m))
         elseif m isa Main.GPTMiniModel.MiniSelfAttention
-            println("Found MiniSelfAttention, checking fields")
+            @info "[SelfAttention]" checking=typeof(m)
             collect_lora_params(m.Wq)
             collect_lora_params(m.Wk)
             collect_lora_params(m.Wv)
             collect_lora_params(m.Wo)
         elseif m isa Main.GPTMiniModel.GPTMini
-            println("Found GPTMini, checking fields")
+            @info "[GPTMini]" traversing=typeof(m)
             collect_lora_params(m.embed)
             collect_lora_params(m.pos_enc)
             collect_lora_params(m.attn)
             collect_lora_params(m.ln)
             collect_lora_params(m.classifier)
+        elseif m isa Flux.Dense || m isa Flux.LayerNorm || m isa Main.GPTMiniModel.LearnablePositionalEncoding
+            return  # skip standard layers
         else
-            println("Unhandled type: ", typeof(m))
+            @info "[Unhandled Layer]" typeof=typeof(m)
         end
     end
+
     collect_lora_params(model)
-    println("LoRA parameters collected: ", length(lora_params))
+
+    @info "[LoRA Summary]" total_params=length(lora_params)
     return lora_params
 end
 

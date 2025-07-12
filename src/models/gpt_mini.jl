@@ -99,29 +99,19 @@ function (m::MiniSelfAttention)(x)
     K = apply_dense3d(m.Wk, x)
     V = apply_dense3d(m.Wv, x)
 
-    println("Q shape: ", size(Q))
-    println("K shape: ", size(K))
-    println("V shape: ", size(V))
-
     Q_perm = permutedims(Q, (2, 1, 3))  # (B, S, D)
     K_perm = permutedims(K, (2, 3, 1))  # (B, D, S)
-    println("Q_perm shape: ", size(Q_perm))
-    println("K_perm shape: ", size(K_perm))
     attn_scores = manual_batched_mul(Q_perm, K_perm) ./ sqrt(Float32(size(Q, 3)))  # (B, S, S)
-    println("attn_scores shape: ", size(attn_scores))
-
     attn_weights = softmax(attn_scores, dims=3)  # (B, S, S)
-    println("attn_weights shape: ", size(attn_weights))
 
     V_perm = permutedims(V, (2, 1, 3))  # (B, S, D)
-    println("V_perm shape: ", size(V_perm))
     context = manual_batched_mul(attn_weights, V_perm)  # (B, S, D)
-    println("context shape: ", size(context))
     context = permutedims(context, (2, 1, 3))  # (S, B, D)
-    println("context permuted shape: ", size(context))
 
     output = apply_dense3d(m.Wo, context)  # (S, B, D)
-    println("output shape: ", size(output))
+
+    @info "[MiniSelfAttention]" x_size=size(x) Q_size=size(Q) K_size=size(K) V_size=size(V) attn_scores=size(attn_scores) context_size=size(context) output_size=size(output)
+
     return output
 end
 
@@ -147,24 +137,19 @@ function GPTMini(cfg::GPTMiniConfig)
 end
 
 function (m::GPTMini)(x::Array{Float32, 3})
-    println("Input x shape: ", size(x))
     h = apply_dense3d(m.embed, x)     # (S, B, D)
-    println("After embed shape: ", size(h))
     h = m.pos_enc(h)                  # (S, B, D)
-    println("After pos_enc shape: ", size(h))
     h = m.attn(h)                     # (S, B, D)
-    println("After attn shape: ", size(h))
     h = permutedims(h, (3, 1, 2))     # (D, S, B)
-    println("Before LayerNorm shape: ", size(h))
     h = m.ln(h)                       # (D, S, B)
-    println("After LayerNorm shape: ", size(h))
-    h = permutedims(h, (2, 3, 1))     # Back to (S, B, D)
-    println("After permute back shape: ", size(h))
+    h = permutedims(h, (2, 3, 1))     # (S, B, D)
     h_flat = reshape(h, :, size(h, 2))  # (S*D, B)
-    println("After reshape shape: ", size(h_flat))
     y = m.classifier(h_flat)           # (n_classes, B)
-    println("After classifier shape: ", size(y))
-    return softmax(y)                 # (B, n_classes)
+    y_out = softmax(y)                 # (n_classes, B)
+
+    @info "[GPTMini Forward]" input_size=size(x) after_embed=size(h) after_posenc=size(h) after_attn=size(h) after_ln=size(h) after_reshape=size(h_flat) logits=size(y) output=size(y_out)
+
+    return y_out
 end
 
 function count_parameters(model)
