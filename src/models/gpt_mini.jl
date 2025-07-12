@@ -1,13 +1,11 @@
+module GPTMiniModel
 using Flux
 using Flux: Dense, softmax, LayerNorm, @functor
 using Random
 
-
-#-----------------------------------------
-# LoRA Adapter Module
-#-----------------------------------------
 include("lora_adapter.jl")
 using .LoRAAdapter: LoRALinear
+
 
 # ----------------------------------------
 # MiniSelfAttention with LoRA
@@ -63,7 +61,6 @@ function LearnablePositionalEncoding(seq_len, d_model)
 end
 
 function (pe::LearnablePositionalEncoding)(x)
-    # x: (S, B, D), P: (S, D)
     return x .+ reshape(pe.P, size(pe.P,1), 1, size(pe.P,2))
 end
 
@@ -76,12 +73,11 @@ function apply_dense3d(d, x::Array{Float32, 3})
     x_flat = reshape(x_flat, in_dim, S * B)    # (in_dim, S*B)
     y_flat = d(x_flat)                         # (out_dim, S*B)
 
-    # Determine output dimension (works for both Dense and LoRALinear)
     out_dim = size(Flux.params(d)[1], 1)
-
     y = reshape(y_flat, out_dim, S, B)         # (out_dim, S, B)
     return permutedims(y, (2, 3, 1))           # (S, B, out_dim)
 end
+
 # ----------------------------------------
 # Self-Attention
 # ----------------------------------------
@@ -103,7 +99,6 @@ function MiniSelfAttention(d_model)
 end
 
 function (m::MiniSelfAttention)(x)
-    # x: (S, B, D)
     Q = apply_dense3d(m.Wq, x)
     K = apply_dense3d(m.Wk, x)
     V = apply_dense3d(m.Wv, x)
@@ -112,7 +107,6 @@ function (m::MiniSelfAttention)(x)
     println("K shape: ", size(K))
     println("V shape: ", size(V))
 
-    # Attention scores: Q (S, B, D) -> (B, S, D), K (S, B, D) -> (B, D, S)
     Q_perm = permutedims(Q, (2, 1, 3))  # (B, S, D)
     K_perm = permutedims(K, (2, 3, 1))  # (B, D, S)
     println("Q_perm shape: ", size(Q_perm))
@@ -123,7 +117,6 @@ function (m::MiniSelfAttention)(x)
     attn_weights = softmax(attn_scores, dims=3)  # (B, S, S)
     println("attn_weights shape: ", size(attn_weights))
 
-    # Context: attn_weights (B, S, S), V (S, B, D) -> (B, S, D)
     V_perm = permutedims(V, (2, 1, 3))  # (B, S, D)
     println("V_perm shape: ", size(V_perm))
     context = manual_batched_mul(attn_weights, V_perm)  # (B, S, D)
@@ -132,7 +125,6 @@ function (m::MiniSelfAttention)(x)
     println("context permuted shape: ", size(context))
 
     output = apply_dense3d(m.Wo, context)  # (S, B, D)
-    
     println("output shape: ", size(output))
     return output
 end
@@ -159,7 +151,6 @@ function GPTMini(cfg::GPTMiniConfig)
 end
 
 function (m::GPTMini)(x::Array{Float32, 3})
-    # x: (S, B, V)
     println("Input x shape: ", size(x))
     h = apply_dense3d(m.embed, x)     # (S, B, D)
     println("After embed shape: ", size(h))
@@ -185,20 +176,6 @@ function count_parameters(model)
 end
 
 # ----------------------------------------
-# Print Dependencies
-# ----------------------------------------
-using Pkg
-function print_used_packages()
-    println("Packages used in GPTMini model:")
-    for (uuid, pkg) in Pkg.dependencies()
-        if hasproperty(pkg, :name) && pkg.name in ["Flux", "Random", "LinearAlgebra", "Statistics", "NNlib"]
-            println("  - $(pkg.name) (Version: $(pkg.version !== nothing ? pkg.version : "unknown"))")
-        end
-    end
-end
-
-
-# ----------------------------------------
 # GPTMini with LoRA
 # ----------------------------------------
 function GPTMini_LoRA(cfg::GPTMiniConfig, r::Int)
@@ -208,4 +185,8 @@ function GPTMini_LoRA(cfg::GPTMiniConfig, r::Int)
     ln = LayerNorm(cfg.d_model)
     classifier = Dense(cfg.seq_len * cfg.d_model, cfg.n_classes)
     return GPTMini(embed, pos, attn, ln, classifier)
+end
+
+export GPTMini, GPTMini_LoRA, GPTMiniConfig, count_parameters
+
 end

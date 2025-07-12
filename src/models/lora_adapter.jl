@@ -27,7 +27,7 @@ function get_lora_params(model)
     lora_params = []
     function collect_lora_params(m)
         println("Inspecting type: ", typeof(m))
-        if m isa LoRALinear
+        if m isa LoRAAdapter.LoRALinear
             println("Found LoRALinear layer: ", m)
             append!(lora_params, Flux.params(m.A, m.B))
         elseif m isa Chain
@@ -35,12 +35,10 @@ function get_lora_params(model)
             for layer in m
                 collect_lora_params(layer)
             end
-        elseif hasfield(typeof(m), :P)  # Handle LearnablePositionalEncoding-like structures
+        elseif hasfield(typeof(m), :P)
             println("Skipping positional encoding-like structure: ", typeof(m))
-            # No LoRA parameters
         elseif m isa Dense || m isa LayerNorm
             println("Skipping Dense or LayerNorm: ", typeof(m))
-            # No LoRA parameters
         elseif hasfield(typeof(m), :Wq) && hasfield(typeof(m), :Wk) && hasfield(typeof(m), :Wv) && hasfield(typeof(m), :Wo)
             println("Found MiniSelfAttention-like structure, checking fields")
             collect_lora_params(m.Wq)
@@ -65,8 +63,6 @@ end
 
 export get_lora_params
 
-function count_parameters(model)
-    return sum(length(p) for p in Flux.params(model))
-end
+
 
 end # module

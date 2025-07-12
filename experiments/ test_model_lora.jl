@@ -1,27 +1,77 @@
 using Revise
 using Flux
 using Random
+using Statistics
+using Test
+using Pkg
+
+# -------------------------------
+# Load Modules
+# -------------------------------
 include("../src/models/gpt_mini.jl")
+include("../src/models/lora_adapter.jl")
 
+# Import from modules
+using .GPTMiniModel: GPTMini_LoRA, GPTMini, GPTMiniConfig, count_parameters, MiniSelfAttention
+using .LoRAAdapter: LoRALinear, get_lora_params
 
-# Print package versions
+# -------------------------------
+# Print Dependencies
+# -------------------------------
+function print_used_packages()
+    println("📦 Packages used in GPTMini model:")
+    for (_, pkg) in Pkg.dependencies()
+        if hasproperty(pkg, :name) && pkg.name in ["Flux", "Random", "LinearAlgebra", "Statistics", "NNlib"]
+            version = isnothing(pkg.version) ? "unknown" : string(pkg.version)
+            println("  - $(pkg.name) (Version: $version)")
+        end
+    end
+end
+
 print_used_packages()
 
-cfg = GPTMiniConfig(50, 4, 8, 3)
+# -------------------------------
+# Config and Input
+# -------------------------------
+cfg = GPTMiniConfig(50, 4, 8, 3)  # vocab_size, seq_len, d_model, n_classes
 seq_len, batch_size, vocab_size = cfg.seq_len, 2, cfg.vocab_size
-
-# Input shape: (S, B, V)
 x = rand(Float32, seq_len, batch_size, vocab_size)
 
-println("✅ Testing Regular GPTMini...")
+# -------------------------------
+# Regular GPTMini Test
+# -------------------------------
+println("\n🧪 Testing Regular GPTMini...")
 model = GPTMini(cfg)
 y = model(x)
-println("Output shape: ", size(y))  # should be (B, n_classes)
-println("Parameter count: ", count_parameters(model))
+println("✅ Output shape: ", size(y))
+println("🧮 Parameter count: ", count_parameters(model))
 
-# LoRA
-println("✅ Testing LoRA GPTMini...")
-lora_model = GPTMini_LoRA(cfg, 2)  # r = 2
+# -------------------------------
+# LoRA GPTMini Test
+# -------------------------------
+println("\n🧪 Testing GPTMini with LoRA...")
+lora_model = GPTMini_LoRA(cfg, 2)  # rank r = 2
 y_lora = lora_model(x)
-println("LoRA Output shape: ", size(y_lora))
-println("LoRA Parameter count: ", count_parameters(lora_model))
+println("✅ LoRA Output shape: ", size(y_lora))
+println("🧮 LoRA Parameter count: ", count_parameters(lora_model))
+
+# -------------------------------
+# Unit Tests
+# -------------------------------
+@testset "LoRA Model Tests" begin
+    cfg = GPTMiniConfig(50, 8, 8, 3)
+    model = GPTMini_LoRA(cfg, 2)
+
+    @test model isa GPTMini
+    @test model.attn isa GPTMiniModel.MiniSelfAttention
+    @test model.attn.Wq isa LoRAAdapter.LoRALinear
+    @test model.attn.Wv isa LoRAAdapter.LoRALinear  # Fix type qualification
+
+    x = rand(Float32, cfg.seq_len, 2, cfg.vocab_size)  # Fix shape: (seq_len, batch_size, vocab_size)
+    y = model(x)
+    @test size(y) == (2, cfg.n_classes)
+
+    lora_params = get_lora_params(model)
+    @test !isempty(lora_params)
+    @test all(p -> p isa AbstractArray, lora_params)
+end
