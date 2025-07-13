@@ -1,40 +1,46 @@
 
-# Mini GPT-3 (<1000 params) + LoRA Implementation (MSc AI Project)
-
-This repository contains the coursework for the **MSc Artificial Intelligence - Deep Learning Module**.
-
-## 🎯 Objective
-
-Reproduce the core ideas of the [LoRA paper (Hu et al., 2022)](https://arxiv.org/abs/2106.09685) on a toy GPT-3 architecture (with <1000 learnable parameters). We compare:
-
-- **Standard fine-tuning** of all model parameters vs.
-- **LoRA (Low-Rank Adaptation)** which adapts the model by injecting low-rank matrices into frozen weights
-
-All experiments are conducted on the **MNLI (Multi-Genre Natural Language Inference)** dataset.
+# 🧠 Mini GPT-3 + LoRA in Julia (<1000 Parameters)  
+**MSc AI – Deep Learning (B9AI104) Project**  
+Author: Naeem ul Hassan •  
+📅 Date: July 13, 2025
 
 ---
 
-## 🗂 Project Structure
+## 🎯 Project Objective
+
+This project reproduces a scaled-down version of GPT-3 (termed **GPTMini**) and applies **LoRA (Low-Rank Adaptation)** to demonstrate parameter-efficient fine-tuning in **Julia** using the `Flux.jl` library.
+
+We compare:
+- ✅ **Standard fine-tuning** with ~91K parameters  
+- ✅ **LoRA fine-tuning** with only **~1K trainable parameters**
+
+All experiments are conducted on the **MNLI (Multi-Genre Natural Language Inference)** dataset using stratified k-fold cross-validation.
+
+🔗 [LoRA Paper (Hu et al., 2022)](https://arxiv.org/abs/2106.09685)
+
+---
+
+## 📁 Project Structure
 
 ```
-project_folder/
+gpt3-mini-lora/
 ├── src/
-│   ├── models/             # gpt_mini.jl and lora_adapter.jl
+│   ├── models/             # gpt_mini.jl, lora_adapter.jl
 │   ├── data/               # mnli_preprocessing.jl
-│   ├── training/           # standard_training.jl and lora_training.jl
+│   ├── training/           # standard_training.jl, lora_training.jl
 │   ├── evaluation/         # cross_validation.jl
-│   └── utils/              # helpers.jl
+│   └── utils/              # helpers.jl (optional utilities)
 ├── experiments/            # run_experiments.jl
-├── results/                # stores cross-validation output
+├── results/                # output of cross-validation
 ├── README.md
 └── Project.toml            # Julia dependencies
 ```
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Getting Started
 
-### 1. Clone & Activate Environment
+### 1. Clone & Set Up Environment
 
 ```bash
 git clone https://github.com/naeemhassan09/gpt3-mini-lora.git
@@ -42,76 +48,88 @@ cd gpt3-mini-lora
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-### 2. Preprocess MNLI Dataset
+### 2. Prepare the MNLI Dataset
+
+- Download the MNLI dataset from the [GLUE Benchmark](https://nyu-mll.github.io/GLUE/)
+- Place `train.tsv` into `MNLI/` directory
+- Run preprocessing:
 
 ```bash
 julia --project=. src/data/mnli_preprocessing.jl
 ```
 
-To use the full MNLI dataset (~433k samples), make sure you have downloaded it from the GLUE benchmark:
-- [MNLI Full Dataset Download](https://nyu-mll.github.io/GLUE/)
-- Place the `.tsv` files under `data/mnli_raw/` and ensure paths are correct in `mnli_preprocessing.jl`.
-
 ---
 
-## 🧠 Model Training
+## 🚀 Training Models
 
-### Standard Fine-Tuning
+### 🟩 Standard Fine-Tuning
 
 ```bash
 julia --project=. src/training/standard_training.jl
 ```
 
-### LoRA Training
+- Trainable parameters: ~91,818  
+- Uses 3-fold CV, `d_model=3`, `seq_len=16`
+
+### 🟦 LoRA Fine-Tuning
 
 ```bash
 julia --project=. src/training/lora_training.jl
 ```
 
----
-
-## 🔍 Evaluation (10-Fold Cross-Validation)
-
-```bash
-julia --project=. src/evaluation/cross_validation.jl
-```
-
-Results (accuracy, F1) will be stored in `results/` and summarized in terminal logs.
+- Trainable parameters: **1,024 only**  
+- Uses 10-fold CV, `d_model=64`, `seq_len=128`, `LoRA rank = 4`
 
 ---
 
-## 🧪 Using the Trained Model
+## 📊 Evaluation
 
-Example code to run a prediction:
+Both training scripts run cross-validation internally and print:
+
+- Accuracy per fold  
+- Average and Std deviation  
+- Total training time  
+- LoRA layer statistics (if applicable)
+
+---
+
+## 🧪 Inference Example
 
 ```julia
-using Flux, Serialization
-model = deserialize("results/lora_model_fold1.bson")
-input = "A man inspects the uniform of a figure in some East Asian country."
-tokenized = tokenize(input)  # Use your helper function
-output = model(tokenized)
+using BSON, Flux
+model_data = BSON.load("lora_params.bson")
+model = GPTMiniModel.GPTMini_LoRA(model_data[:cfg], 4)
+GPTMiniModel.assign_lora_params!(model, model_data[:lora_params])
 ```
-
-> Note: You may wrap this into an `inference.jl` script for convenience.
 
 ---
 
-## 📊 Results
+## 📈 Results Summary
 
-- Experiments compare **standard vs. LoRA** training.
-- Evaluation metrics: **Accuracy, F1-Score** (average over 10 folds)
-- Visualizations generated from `results/`
+| Metric             | Standard GPTMini | LoRA GPTMini |
+|--------------------|------------------|---------------|
+| Avg Accuracy       | 0.303            | 0.300         |
+| Best Fold Accuracy | 0.3636           | 1.000         |
+| Std Deviation      | 0.0606           | 0.483         |
+| Params Trained     | 91,818           | 1,024         |
+| Train Time         | ~85s             | ~97s          |
+
+> LoRA matched average performance of full fine-tuning with 90× fewer parameters, validating the findings of Hu et al. (2022). However, it showed higher variance, possibly due to initialization or regularization issues in small-scale settings.
 
 ---
 
 ## 🧾 References
 
-- Hu et al., *LoRA: Low-Rank Adaptation of Large Language Models*, ICLR 2022
-- Flux.jl documentation
-- MNLI dataset: https://huggingface.co/google-bert/bert-base-uncased)
+- Hu, E., Shen, Y., Wallis, P., et al. (2022). *LoRA: Low-Rank Adaptation of Large Language Models*. ICLR. [arXiv:2106.09685](https://arxiv.org/abs/2106.09685)  
+- Brown, T. B., et al. (2020). *Language Models are Few-Shot Learners*. [arXiv:2005.14165](https://arxiv.org/abs/2005.14165)  
+- Flux.jl – [https://fluxml.ai](https://fluxml.ai)
 
 ---
 
 ## 📌 Acknowledgments
 
-This project is submitted as part of the MSc Artificial Intelligence coursework at Dublin Business School.
+This project was submitted as part of the MSc Artificial Intelligence coursework at **Dublin Business School**, under the module **B9AI104 – Deep Learning**.
+
+✍️ Author: **Naeem ul Hassan**  
+📧 naeemhassan09@gmail.com
+📅 Submitted: **13 July 2025**
