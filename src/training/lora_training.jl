@@ -7,14 +7,26 @@ using .GPTMiniModel, .MNLIData, .CrossValidation
 
 global_logger(ConsoleLogger(stdout, Logging.Info))
 
-x_data, y_data, vocab = load_mnli_data(128, 50)
+# === HARD-CODED EXPERIMENT CONFIG ===
+const MODEL_NAME = "GPTMini_LoRA"
+const LORA_RANK = 4 # LoRA rank
+const EPOCHS = 3 # Number of epochs for training
+const BATCH_SIZE = 16 # Batch size for training
+const NUM_FOLDS = 3 # Number of folds for cross-validation
+const LR = 3e-2 #Learning Rate
+const SEQ_LEN = 128
+const EMBEDDING_DIM = 64 # Embedding dimension
+const ROWS = 3 # Number of Rows from Data file to load
+const CLASSES= 3 # Number of output classes
+# === Load Data ===
+x_data, y_data, vocab = load_mnli_data(SEQ_LEN, ROWS)
 @info "Loaded MNLI data: $(length(x_data)) samples, vocab size: $(length(vocab))"
 @info typeof(x_data[1]) 
-cfg = GPTMiniConfig(length(vocab), 128, 64, 3) 
 
+cfg = GPTMiniConfig(length(vocab), SEQ_LEN, EMBEDDING_DIM, CLASSES)
 
-# Count LoRA-only parameters
-test_model = GPTMini_LoRA(cfg, 4)
+# === Parameter Sanity Check ===
+test_model = GPTMini_LoRA(cfg, LORA_RANK)
 function count_lora_parameters(model)
     lora_params = get_lora_params(model)
     return sum(length, lora_params)
@@ -22,7 +34,7 @@ end
 @info "LoRA-only trainable parameters: $(count_lora_parameters(test_model))"
 @assert count_lora_parameters(test_model) < 1050 "Model exceeds parameter limit!"
 
-# Define train_step
+# === Define train_step ===
 function train_step(model, x, y, opt_state)
     lora_params = get_lora_params(model)
     function loss_fn(params)
@@ -38,13 +50,13 @@ function train_step(model, x, y, opt_state)
     return loss, opt_state
 end
 
-# Run 10-fold CV
-opt = Optimisers.ADAM(3e-2)
+# === Train & Evaluate ===
+opt = Optimisers.ADAM(LR)
 opt_state = Optimisers.setup(opt, nothing)
-accs = run_cross_validation(() -> GPTMini_LoRA(cfg, 8), x_data, y_data, cfg.n_classes;
-                            train_step=train_step, cfg=cfg, folds=10, batch_size=16)
+accs = run_cross_validation(() -> GPTMini_LoRA(cfg, LORA_RANK), x_data, y_data, cfg.n_classes;
+                            train_step=train_step, cfg=cfg, folds=NUM_FOLDS, batch_size=BATCH_SIZE)
 
-valid_accs = filter(x -> x !== nothing, accs)
+valid_accs = filter(x -> x !== nothing && !isnan(x), accs)
 
 if !isempty(valid_accs)
     @info "Best accuracy: $(maximum(valid_accs))"
@@ -53,6 +65,32 @@ else
     @warn "No valid fold accuracies returned!"
 end
 
-# Save parameters
+# === Save Model Parameters ===
 lora_params = get_lora_params(test_model)
 @save "lora_params.bson" lora_params vocab cfg
+
+# === Print Summary ===
+@info "========== Training Summary =========="
+@info "Model       : $MODEL_NAME"
+@info "LoRA Rank   : $LORA_RANK"
+@info "Seq Length  : $(cfg.seq_len)"
+@info "Embedding   : $(cfg.d_model)"
+@info "Classes     : $(cfg.n_classes)"
+@info "Vocab Size  : $(length(vocab))"
+@info "Train Epochs: $EPOCHS"
+@info "Batch Size  : $BATCH_SIZE"
+@info "Learning Rate: $LR"
+@info "Folds       : $NUM_FOLDS"
+
+@info "LoRA Parameters Count: $(sum(length, lora_params))"
+for (i, p) in enumerate(lora_params)
+    @info "  Param $i size = $(size(p)), mean = $(round(mean(p), digits=4))"
+end
+
+if !isempty(valid_accs)
+    @info "Final Best Accuracy   : $(round(maximum(valid_accs), digits=4))"
+    @info "Final Avg Accuracy    : $(round(mean(valid_accs), digits=4))"
+    @info "Final Std Deviation   : $(round(std(valid_accs), digits=4))"
+else
+    @warn "All folds returned NaN accuracy. Check logits/prediction logic."
+end
