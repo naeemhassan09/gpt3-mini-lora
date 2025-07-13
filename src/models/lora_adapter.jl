@@ -30,7 +30,7 @@ function get_lora_params(model)
 
     function collect_lora_params(m)
         if m isa LoRAAdapter.LoRALinear
-            @info "[LoRA Param]" found=typeof(m)
+            #@info "[LoRA Param]" found=typeof(m)
             append!(lora_params, Flux.params(m.A, m.B))
         elseif m isa Flux.Chain
             for layer in m

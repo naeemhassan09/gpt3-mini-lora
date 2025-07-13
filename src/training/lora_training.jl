@@ -12,11 +12,11 @@ const MODEL_NAME = "GPTMini_LoRA"
 const LORA_RANK = 4 # LoRA rank
 const EPOCHS = 3 # Number of epochs for training
 const BATCH_SIZE = 16 # Batch size for training
-const NUM_FOLDS = 3 # Number of folds for cross-validation
+const NUM_FOLDS = 10 # Number of folds for cross-validation
 const LR = 3e-2 #Learning Rate
 const SEQ_LEN = 128
 const EMBEDDING_DIM = 64 # Embedding dimension
-const ROWS = 3 # Number of Rows from Data file to load
+const ROWS = 10 # Number of Rows from Data file to load
 const CLASSES= 3 # Number of output classes
 # === Load Data ===
 x_data, y_data, vocab = load_mnli_data(SEQ_LEN, ROWS)
@@ -53,9 +53,12 @@ end
 # === Train & Evaluate ===
 opt = Optimisers.ADAM(LR)
 opt_state = Optimisers.setup(opt, nothing)
-accs = run_cross_validation(() -> GPTMini_LoRA(cfg, LORA_RANK), x_data, y_data, cfg.n_classes;
-                            train_step=train_step, cfg=cfg, folds=NUM_FOLDS, batch_size=BATCH_SIZE)
 
+@info "Starting training and cross-validation..."
+train_time = @elapsed begin
+    accs = run_cross_validation(() -> GPTMini_LoRA(cfg, LORA_RANK), x_data, y_data, cfg.n_classes;
+                            train_step=train_step, cfg=cfg, folds=NUM_FOLDS, batch_size=BATCH_SIZE)
+end
 valid_accs = filter(x -> x !== nothing && !isnan(x), accs)
 
 if !isempty(valid_accs)
@@ -86,7 +89,7 @@ lora_params = get_lora_params(test_model)
 for (i, p) in enumerate(lora_params)
     @info "  Param $i size = $(size(p)), mean = $(round(mean(p), digits=4))"
 end
-
+@info "Total Training Time (seconds): $(round(train_time, digits=2))"
 if !isempty(valid_accs)
     @info "Final Best Accuracy   : $(round(maximum(valid_accs), digits=4))"
     @info "Final Avg Accuracy    : $(round(mean(valid_accs), digits=4))"

@@ -16,7 +16,7 @@ const NUM_FOLDS = 3
 const LR = 3e-2
 const SEQ_LEN = 16
 const EMBEDDING_DIM = 3
-const ROWS = 3
+const ROWS = 100
 const CLASSES = 3
 
 # === LOAD DATA ===
