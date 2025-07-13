@@ -50,7 +50,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 ### 2. Prepare the MNLI Dataset
 
-- Download the MNLI dataset from the [GLUE Benchmark](https://nyu-mll.github.io/GLUE/)
+- Download the MNLI dataset from the [https://huggingface.co/google-bert/bert-base-uncased)
 - Place `train.tsv` into `MNLI/` directory
 - Run preprocessing:
 
