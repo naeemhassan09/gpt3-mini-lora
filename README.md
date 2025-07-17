@@ -53,7 +53,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 - Download the MNLI dataset from the [https://huggingface.co/google-bert/bert-base-uncased)
 - Place `train.tsv` into `MNLI/` directory
 - Run preprocessing:
-
+- Datadownload link:  wget https://dl.fbaipublicfiles.com/glue/data/MNLI.zip
 ```bash
 julia --project=. src/data/mnli_preprocessing.jl
 ```
